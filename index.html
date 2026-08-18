@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<!-- CloudCalc is a client-side app, ready for GitHub Pages. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="CloudCalc is a free scientific calculator with graphing, statistics, and local calculation history.">
+<title>CloudCalc â€” Advanced Scientific Calculator</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=DM+Sans:wght@300;400;500;600&family=Bebas+Neue&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+/* â”€â”€â”€ DESIGN TOKENS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+:root {
+  --bg:        #f5f4f0;
+  --surface:   #ffffff;
+  --card:      #fafaf8;
+  --border:    #e2e0da;
+  --border2:   #cccac2;
+  --ink:       #1a1916;
+  --ink2:      #4a4844;
+  --ink3:      #9a9890;
+  --accent:    #1a1916;
+  --gold:      #c9a84c;
+  --gold-lt:   #f0e6c8;
+  --green:     #2d7a4f;
+  --green-lt:  #d4eedf;
+  --red:       #b83232;
+  --red-lt:    #fde8e8;
+  --mono:      'DM Mono', monospace;
+  --sans:      'DM Sans', sans-serif;
+  --display:   'Bebas Neue', sans-serif;
+  --radius:    10px;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.07);
+  --shadow:    0 4px 16px rgba(0,0,0,0.09);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.12);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  overflow-x: hidden;
+}
+
+/* subtle linen texture */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");
+}
+
+/* â”€â”€â”€ HEADER â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+header {
+  position: relative; z-index: 10;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 2rem; height: 60px;
+  background: var(--ink);
+  border-bottom: 3px solid var(--gold);
+}
+
+.logo {
+  font-family: var(--display);
+  font-size: 1.75rem;
+  letter-spacing: 0.12em;
+  color: #fff;
+}
+.logo em {
+  color: var(--gold);
+  font-style: normal;
+}
+.logo-sub {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  color: var(--ink3);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  margin-top: -4px;
+}
+
+.header-right { display: flex; align-items: center; gap: 1.5rem; }
+
+.mode-toggle {
+  display: flex;
+  gap: 2px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 6px;
+  padding: 3px;
+  border: 1px solid rgba(255,255,255,0.12);
+}
+.mode-btn {
+  padding: 0.28rem 0.85rem;
+  border: none; border-radius: 4px; cursor: pointer;
+  font-family: var(--mono); font-size: 0.7rem; font-weight: 500;
+  letter-spacing: 0.1em;
+  background: transparent; color: rgba(255,255,255,0.45);
+  transition: all 0.15s;
+}
+.mode-btn.active {
+  background: var(--gold);
+  color: var(--ink);
+}
+
+/* â”€â”€â”€ MAIN LAYOUT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+main {
+  position: relative; z-index: 1;
+  display: grid;
+  grid-template-columns: 400px 1fr;
+  height: calc(100vh - 60px - 40px);
+  overflow: hidden;
+}
+
+/* â”€â”€â”€ LEFT PANEL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.left-panel {
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  z-index: 2;
+}
+
+.tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+}
+.tab {
+  flex: 1;
+  padding: 0.75rem 0.2rem;
+  font-family: var(--mono); font-size: 0.63rem; font-weight: 500;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  border: none; cursor: pointer;
+  background: transparent; color: var(--ink3);
+  border-bottom: 2px solid transparent;
+  transition: all 0.14s;
+}
+.tab:hover { color: var(--ink2); }
+.tab.active {
+  color: var(--ink);
+  border-bottom-color: var(--gold);
+  background: var(--surface);
+}
+
+.tab-content {
+  display: none; flex: 1; overflow-y: auto;
+  padding: 1.25rem;
+  flex-direction: column; gap: 1rem;
+}
+.tab-content.active { display: flex; }
+.tab-content::-webkit-scrollbar { width: 4px; }
+.tab-content::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+/* â”€â”€â”€ DISPLAY â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.display {
+  background: var(--ink);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem 1.1rem;
+  min-height: 80px;
+  display: flex; flex-direction: column; justify-content: flex-end; gap: 4px;
+  box-shadow: var(--shadow-lg);
+}
+.display-expr {
+  font-family: var(--mono); font-size: 0.7rem;
+  color: rgba(255,255,255,0.3); min-height: 16px;
+  word-break: break-all; letter-spacing: 0.04em;
+}
+.display-result {
+  font-family: var(--mono); font-size: 1.75rem; font-weight: 400;
+  color: var(--gold); word-break: break-all; text-align: right;
+  transition: color 0.2s; letter-spacing: -0.01em;
+}
+.display-result.error { color: #f07070; font-size: 0.88rem; }
+
+/* â”€â”€â”€ KEYPAD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.keypad {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+.key {
+  aspect-ratio: 1 / 0.75;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--card);
+  color: var(--ink2);
+  font-family: var(--mono); font-size: 0.76rem; font-weight: 400;
+  cursor: pointer; transition: all 0.1s;
+  display: flex; align-items: center; justify-content: center;
+  user-select: none; box-shadow: var(--shadow-sm);
+}
+.key:hover { background: var(--border); transform: translateY(-1px); box-shadow: var(--shadow); }
+.key:active { transform: scale(0.96); box-shadow: none; }
+.key.op  { color: var(--gold); border-color: #e8d8a0; background: #fefbf0; }
+.key.fn  { color: var(--green); border-color: #b8ddc8; background: #f4fdf8; font-size: 0.65rem; }
+.key.eq  { background: var(--ink); color: var(--gold); border-color: var(--ink); font-size: 1.1rem; }
+.key.eq:hover { background: #333; }
+.key.clr { color: var(--red); border-color: #f0c0c0; background: #fff8f8; }
+
+/* â”€â”€â”€ FORM ELEMENTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field label {
+  font-family: var(--mono); font-size: 0.63rem;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--ink3);
+}
+input[type=text], input[type=number], select, textarea {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--ink);
+  font-family: var(--mono); font-size: 0.82rem;
+  padding: 0.55rem 0.85rem; width: 100%;
+  outline: none; transition: border-color 0.15s, box-shadow 0.15s;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.04);
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px var(--gold-lt), inset 0 1px 3px rgba(0,0,0,0.04);
+}
+select option { background: #fff; }
+textarea { resize: vertical; min-height: 70px; }
+
+/* â”€â”€â”€ BUTTONS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.btn {
+  padding: 0.6rem 1.1rem;
+  border: none; border-radius: var(--radius); cursor: pointer;
+  font-family: var(--mono); font-size: 0.75rem; font-weight: 500;
+  letter-spacing: 0.06em; transition: all 0.13s;
+}
+.btn-primary { background: var(--ink); color: var(--gold); box-shadow: var(--shadow-sm); }
+.btn-primary:hover { background: #2e2c28; transform: translateY(-1px); box-shadow: var(--shadow); }
+.btn-danger  { background: transparent; color: var(--red); border: 1px solid #f0c0c0; }
+.btn-danger:hover { background: var(--red-lt); }
+.btn-muted   { background: var(--card); color: var(--ink2); border: 1px solid var(--border); }
+.btn-muted:hover { border-color: var(--border2); color: var(--ink); }
+.btn-row { display: flex; gap: 7px; flex-wrap: wrap; }
+
+/* â”€â”€â”€ RESULT CARD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.result-card {
+  background: var(--green-lt);
+  border: 1px solid #a8d8bc;
+  border-radius: var(--radius);
+  padding: 0.9rem 1rem;
+  font-family: var(--mono);
+  display: none;
+}
+.result-card.visible { display: block; }
+.result-card .rc-label {
+  color: var(--green);
+  font-size: 0.62rem; letter-spacing: 0.12em;
+  text-transform: uppercase; margin-bottom: 4px;
+}
+.result-card .rc-value { color: var(--green); font-size: 1.3rem; font-weight: 500; word-break: break-all; }
+.result-card .rc-value.err { color: var(--red); font-size: 0.82rem; background: var(--red-lt); }
+
+/* â”€â”€â”€ STATS GRID â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.stats-grid { display: none; grid-template-columns: 1fr 1fr; gap: 6px; }
+.stats-grid.visible { display: grid; }
+.stat-cell {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px; padding: 0.55rem 0.75rem;
+  font-family: var(--mono);
+}
+.stat-cell .sc-label { font-size: 0.6rem; color: var(--ink3); letter-spacing: 0.1em; text-transform: uppercase; }
+.stat-cell .sc-val   { font-size: 0.92rem; color: var(--ink); font-weight: 500; }
+
+/* â”€â”€â”€ HISTORY â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.history-list { display: flex; flex-direction: column; gap: 4px; }
+.history-item {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem 0.8rem;
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 0.75rem; transition: border-color 0.13s;
+}
+.history-item:hover { border-color: var(--gold); }
+.hi-expr   { font-family: var(--mono); font-size: 0.72rem; color: var(--ink3); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hi-result { font-family: var(--mono); font-size: 0.78rem; color: var(--green); font-weight: 500; white-space: nowrap; }
+
+/* â”€â”€â”€ VARS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.var-item {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem 0.8rem;
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: var(--mono); font-size: 0.78rem;
+}
+.var-item .vn { color: var(--gold); font-weight: 500; }
+.var-item .vv { color: var(--green); }
+.var-del { background: none; border: none; color: var(--ink3); cursor: pointer; font-size: 0.9rem; }
+.var-del:hover { color: var(--red); }
+
+/* â”€â”€â”€ CHIPS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.chip {
+  display: inline-block;
+  background: var(--gold-lt);
+  color: var(--ink);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-family: var(--mono); font-size: 0.64rem; font-weight: 500;
+  border: 1px solid #e8d8a0;
+}
+
+/* â”€â”€â”€ SECTION HEADING â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.section-label {
+  font-family: var(--mono); font-size: 0.62rem;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--ink3);
+  display: flex; align-items: center; gap: 8px;
+}
+.section-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* â”€â”€â”€ RIGHT PANEL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.right-panel {
+  display: flex; flex-direction: column;
+  padding: 1.4rem 1.6rem; gap: 1rem;
+  overflow-y: auto;
+  background: var(--bg);
+}
+
+.panel-heading {
+  font-family: var(--display);
+  font-size: 1.4rem;
+  letter-spacing: 0.1em;
+  color: var(--ink);
+  border-bottom: 2px solid var(--gold);
+  padding-bottom: 0.4rem;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.panel-heading small {
+  font-family: var(--mono);
+  font-size: 0.63rem;
+  color: var(--ink3);
+  letter-spacing: 0.1em;
+  font-weight: 400;
+  text-transform: uppercase;
+}
+
+.graph-controls {
+  display: grid;
+  grid-template-columns: 1fr 130px auto;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.graph-wrap {
+  flex: 1; min-height: 280px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1.2rem;
+  box-shadow: var(--shadow);
+}
+
+.quick-btns {
+  display: flex; gap: 5px; flex-wrap: wrap;
+}
+.quick-btns .btn {
+  font-size: 0.65rem;
+  padding: 3px 9px;
+  border-radius: 20px;
+}
+
+/* â”€â”€â”€ FOOTER â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+footer {
+  position: relative; z-index: 10;
+  border-top: 1px solid var(--border);
+  padding: 0 2rem; height: 40px;
+  display: flex; justify-content: space-between; align-items: center;
+  background: var(--ink);
+}
+footer span {
+  font-family: var(--mono); font-size: 0.63rem;
+  color: rgba(255,255,255,0.3);
+}
+footer span.footer-live { color: rgba(255,255,255,0.55); }
+
+.status-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #4caf88;
+  display: inline-block;
+  margin-right: 6px;
+  animation: pulse 2.5s infinite;
+}
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+/* â”€â”€â”€ SCROLLBAR â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+/* â”€â”€â”€ RESPONSIVE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+@media (max-width: 860px) {
+  main { grid-template-columns: 1fr; }
+  .right-panel { display: none; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">Cloud<em>Calc</em></div>
+  </div>
+  <div class="header-right">
+    <div class="mode-toggle">
+      <button class="mode-btn active" onclick="setMode('degree')" id="btnDeg">DEG</button>
+      <button class="mode-btn"        onclick="setMode('radian')" id="btnRad">RAD</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- â”€â”€ LEFT PANEL â”€â”€ -->
+  <div class="left-panel">
+    <div class="tabs">
+      <button class="tab active" onclick="openTab(this,'calc')">CALC</button>
+      <button class="tab"        onclick="openTab(this,'expr')">EXPR</button>
+      <button class="tab"        onclick="openTab(this,'stats')">STATS</button>
+      <button class="tab"        onclick="openTab(this,'vars')">VARS</button>
+      <button class="tab"        onclick="openTab(this,'hist')">LOG</button>
+    </div>
+
+    <!-- CALC -->
+    <div class="tab-content active" id="tab-calc">
+      <div class="display">
+        <div class="display-expr" id="calcExpr"></div>
+        <div class="display-result" id="calcResult">0</div>
+      </div>
+
+      <div style="display:flex;gap:10px">
+        <div class="field" style="flex:1">
+          <label>Operation</label>
+          <select id="calcOp">
+            <optgroup label="Trigonometric">
+              <option value="sin">sin</option><option value="cos">cos</option><option value="tan">tan</option>
+              <option value="asin">asinâ»Â¹</option><option value="acos">acosâ»Â¹</option><option value="atan">atanâ»Â¹</option>
+            </optgroup>
+            <optgroup label="Hyperbolic">
+              <option value="sinh">sinh</option><option value="cosh">cosh</option><option value="tanh">tanh</option>
+            </optgroup>
+            <optgroup label="Power / Root">
+              <option value="sqrt">âˆš sqrt</option><option value="cbrt">âˆ› cbrt</option><option value="exp">eË£ exp</option>
+            </optgroup>
+            <optgroup label="Logarithm">
+              <option value="log">ln natural</option><option value="log2">logâ‚‚</option><option value="log10">logâ‚â‚€</option>
+            </optgroup>
+            <optgroup label="Misc">
+              <option value="factorial">n! factorial</option><option value="abs">|x| absolute</option>
+              <option value="ceil">âŒˆxâŒ‰ ceil</option><option value="floor">âŒŠxâŒ‹ floor</option>
+              <option value="todeg">â†’ degrees</option><option value="torad">â†’ radians</option>
+            </optgroup>
+          </select>
+        </div>
+        <div class="field" style="width:115px">
+          <label>Value</label>
+          <input type="number" id="calcValue" placeholder="0" step="any">
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" style="flex:1" onclick="runCalc()">CALCULATE</button>
+        <button class="btn btn-muted" onclick="clearCalc()">CLR</button>
+      </div>
+
+      <div class="section-label">Quick Pad</div>
+      <div class="keypad">
+        <button class="key fn" onclick="setOp('sin')">sin</button>
+        <button class="key fn" onclick="setOp('cos')">cos</button>
+        <button class="key fn" onclick="setOp('tan')">tan</button>
+        <button class="key fn" onclick="setOp('sqrt')">âˆšx</button>
+        <button class="key fn" onclick="setOp('log')">ln</button>
+        <button class="key fn" onclick="setOp('asin')">sinâ»Â¹</button>
+        <button class="key fn" onclick="setOp('acos')">cosâ»Â¹</button>
+        <button class="key fn" onclick="setOp('atan')">tanâ»Â¹</button>
+        <button class="key fn" onclick="setOp('log10')">log</button>
+        <button class="key fn" onclick="setOp('exp')">eË£</button>
+        <button class="key" onclick="appendVal('7')">7</button>
+        <button class="key" onclick="appendVal('8')">8</button>
+        <button class="key" onclick="appendVal('9')">9</button>
+        <button class="key clr" onclick="backspace()">âŒ«</button>
+        <button class="key clr" onclick="clearCalc()">C</button>
+        <button class="key" onclick="appendVal('4')">4</button>
+        <button class="key" onclick="appendVal('5')">5</button>
+        <button class="key" onclick="appendVal('6')">6</button>
+        <button class="key op" onclick="appendVal('-')">âˆ’</button>
+        <button class="key op" onclick="appendVal('+')">+</button>
+        <button class="key" onclick="appendVal('1')">1</button>
+        <button class="key" onclick="appendVal('2')">2</button>
+        <button class="key" onclick="appendVal('3')">3</button>
+        <button class="key op" onclick="appendVal('*')">Ã—</button>
+        <button class="key op" onclick="appendVal('/')">Ã·</button>
+        <button class="key" onclick="appendVal('0')">0</button>
+        <button class="key" onclick="appendVal('.')">.</button>
+        <button class="key fn" onclick="appendVal(String(Math.E))" title="Euler e">e</button>
+        <button class="key fn" onclick="appendVal(String(Math.PI))" title="Pi">Ï€</button>
+        <button class="key eq" onclick="runCalc()">=</button>
+      </div>
+    </div>
+
+    <!-- EXPR -->
+    <div class="tab-content" id="tab-expr">
+      <div class="field">
+        <label>Mathematical Expression</label>
+        <textarea id="exprInput" placeholder="sin(30)**2 + cos(30)**2&#10;log(E**2) + tan(45)&#10;factorial(10) / comb(10,3)"></textarea>
+      </div>
+      <div style="font-family:var(--mono);font-size:0.68rem;color:var(--ink3);line-height:1.7">
+        Functions: sin cos tan asin acos atan sinh cosh tanh sqrt cbrt log log2 log10 exp factorial abs ceil floor gcd hypot<br>
+        Constants: <span class="chip">PI</span> <span class="chip">E</span> <span class="chip">TAU</span>
+        &nbsp;Â·&nbsp; Use <code style="color:var(--green)">**</code> for power, <code style="color:var(--green)">^</code> also works.
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" style="flex:1" onclick="runExpr()">EVALUATE</button>
+        <button class="btn btn-muted" onclick="document.getElementById('exprInput').value=''">CLR</button>
+      </div>
+      <div class="result-card" id="exprResult">
+        <div class="rc-label">Result</div>
+        <div class="rc-value" id="exprResultVal"></div>
+      </div>
+      <div class="field">
+        <label>Quick Examples</label>
+        <div class="quick-btns">
+          <button class="btn btn-muted" onclick="fillExpr('sin(30)**2 + cos(30)**2')">sinÂ²+cosÂ²=1</button>
+          <button class="btn btn-muted" onclick="fillExpr('sqrt(2)*PI')">âˆš2Â·Ï€</button>
+          <button class="btn btn-muted" onclick="fillExpr('log(E**2)')">ln(eÂ²)=2</button>
+          <button class="btn btn-muted" onclick="fillExpr('factorial(10)')">10!</button>
+          <button class="btn btn-muted" onclick="fillExpr('comb(10,3)')">C(10,3)</button>
+          <button class="btn btn-muted" onclick="fillExpr('hypot(3,4)')">hypot(3,4)</button>
+          <button class="btn btn-muted" onclick="fillExpr('tan(45)**2 + 1')">tanÂ²(45)+1</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STATS -->
+    <div class="tab-content" id="tab-stats">
+      <div class="field">
+        <label>Numbers (comma-separated)</label>
+        <textarea id="statsInput" placeholder="12, 45, 67, 23, 89, 34, 55, 78"></textarea>
+      </div>
+      <button class="btn btn-primary" onclick="runStats()">COMPUTE STATISTICS</button>
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-cell"><div class="sc-label">Count</div><div class="sc-val" id="st-count">â€”</div></div>
+        <div class="stat-cell"><div class="sc-label">Sum</div><div class="sc-val" id="st-sum">â€”</div></div>
+        <div class="stat-cell"><div class="sc-label">Mean</div><div class="sc-val" id="st-mean">â€”</div></div>
+        <div class="stat-cell"><div class="sc-label">Median</div><div class="sc-val" id="st-median">â€”</div></div>
+        <div class="stat-cell"><div class="sc-label">Std Dev</div><div class="sc-val" id="st-std">â€”</div></div>
+        <div class="stat-cell"><div class="sc-label">Variance</div><div class="sc-val" id="st-var">â€”</div></div>
+        <div class="stat-cell"><div class="sc-label">Min</div><div class="sc-val" id="st-min">â€”</div></div>
+        <div class="stat-cell"><div class="sc-label">Max</div><div class="sc-val" id="st-max">â€”</div></div>
+        <div class="stat-cell"><div class="sc-label">Range</div><div class="sc-val" id="st-range">â€”</div></div>
+        <div class="stat-cell"><div class="sc-label">Med Abs Dev</div><div class="sc-val" id="st-mad">â€”</div></div>
+      </div>
+    </div>
+
+    <!-- VARS -->
+    <div class="tab-content" id="tab-vars">
+      <div style="font-family:var(--mono);font-size:0.7rem;color:var(--ink3);line-height:1.6">
+        Save named constants and use them in the EXPR tab.
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="field"><label>Name</label><input type="text" id="varName" placeholder="G"></div>
+        <div class="field"><label>Value</label><input type="number" id="varValue" placeholder="9.81" step="any"></div>
+      </div>
+      <button class="btn btn-primary" onclick="saveVar()">SAVE VARIABLE</button>
+      <div id="varList" style="display:flex;flex-direction:column;gap:5px"></div>
+    </div>
+
+    <!-- LOG -->
+    <div class="tab-content" id="tab-hist">
+      <div class="btn-row">
+        <button class="btn btn-muted" style="flex:1" onclick="renderHistory()">â†» Refresh</button>
+        <button class="btn btn-danger" onclick="clearHist()">Clear All</button>
+      </div>
+      <div class="history-list" id="historyList">
+        <div style="color:var(--ink3);font-family:var(--mono);font-size:0.74rem;padding:1.5rem;text-align:center">
+          No calculations yet.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- â”€â”€ RIGHT PANEL â”€â”€ -->
+  <div class="right-panel">
+    <div class="panel-heading">
+      Function Visualizer
+      <small id="graphInfo"></small>
+    </div>
+
+    <div class="graph-controls">
+      <div class="field"><label>f(x) =</label><input type="text" id="graphFn" value="sin(x)"></div>
+      <div class="field"><label>X Range</label><input type="text" id="graphRange" value="-360, 360"></div>
+      <button class="btn btn-primary" onclick="plotGraph()" style="align-self:flex-end">PLOT</button>
+    </div>
+
+    <div class="quick-btns">
+      <button class="btn btn-muted" onclick="setGfn('sin(x)')">sin(x)</button>
+      <button class="btn btn-muted" onclick="setGfn('cos(x)')">cos(x)</button>
+      <button class="btn btn-muted" onclick="setGfn('tan(x)')">tan(x)</button>
+      <button class="btn btn-muted" onclick="setGfn('sin(x)**2+cos(x)**2')">sinÂ²+cosÂ²</button>
+      <button class="btn btn-muted" onclick="setGfn('x**2','-10,10')">xÂ²</button>
+      <button class="btn btn-muted" onclick="setGfn('sqrt(x)','0,100')">âˆšx</button>
+      <button class="btn btn-muted" onclick="setGfn('log(x)','0.01,100')">ln(x)</button>
+      <button class="btn btn-muted" onclick="setGfn('exp(x)','-3,3')">eË£</button>
+      <button class="btn btn-muted" onclick="setGfn('sin(x)+sin(3*x)/3+sin(5*x)/5')">Square wave</button>
+    </div>
+
+    <div class="graph-wrap"><canvas id="mainChart"></canvas></div>
+  </div>
+</main>
+
+<footer>
+  <span class="footer-live"><span class="status-dot"></span>Standalone â€” no server required</span>
+  <span id="footerMode">MODE: DEG</span>
+  <span id="footerTime"></span>
+</footer>
+
+<script>
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+//  MATH ENGINE
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+let calcMode = 'degree';
+let userVars  = {};
+let history   = [];
+let chartInst = null;
+
+const SAFE_IDENTIFIERS = new Set([
+  'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'sinh', 'cosh', 'tanh',
+  'asinh', 'acosh', 'atanh', 'sqrt', 'cbrt', 'exp', 'pow', 'log', 'log2',
+  'log10', 'abs', 'ceil', 'floor', 'round', 'factorial', 'comb', 'perm',
+  'gcd', 'hypot', 'sign', 'min', 'max', 'PI', 'E', 'TAU', 'Infinity'
+]);
+const RESERVED_IDENTIFIERS = new Set([
+  'arguments', 'await', 'break', 'case', 'catch', 'class', 'const',
+  'constructor', 'continue', 'debugger', 'default', 'delete', 'do', 'else',
+  'eval', 'export', 'extends', 'false', 'finally', 'for', 'function', 'if',
+  'import', 'in', 'instanceof', 'let', 'new', 'null', 'return', 'super',
+  'switch', 'this', 'throw', 'true', 'try', 'typeof', 'undefined', 'var',
+  'void', 'while', 'window', 'with', 'yield'
+]);
+
+const toRad = d => d * Math.PI / 180;
+
+function factorial(n) {
+  n = Math.round(n);
+  if (n < 0 || n > 170) throw new Error('factorial out of range');
+  let r = 1; for (let i = 2; i <= n; i++) r *= i; return r;
+}
+function comb(n, k) {
+  n = Math.round(n); k = Math.round(k);
+  if (k < 0 || k > n) return 0;
+  return factorial(n) / (factorial(k) * factorial(n - k));
+}
+function perm(n, k) { return factorial(n) / factorial(n - k); }
+function gcd(a, b)  { a = Math.abs(Math.round(a)); b = Math.abs(Math.round(b)); while (b) { let t = b; b = a % b; a = t; } return a; }
+function cbrt(x)    { return Math.sign(x) * Math.pow(Math.abs(x), 1/3); }
+
+function sinF(x)  { return Math.sin(calcMode === 'degree' ? toRad(x) : x); }
+function cosF(x)  { return Math.cos(calcMode === 'degree' ? toRad(x) : x); }
+function tanF(x)  { return Math.tan(calcMode === 'degree' ? toRad(x) : x); }
+function asinF(x) { const r = Math.asin(x); return calcMode === 'degree' ? r * 180 / Math.PI : r; }
+function acosF(x) { const r = Math.acos(x); return calcMode === 'degree' ? r * 180 / Math.PI : r; }
+function atanF(x) { const r = Math.atan(x); return calcMode === 'degree' ? r * 180 / Math.PI : r; }
+
+function evalExpr(expr) {
+  if (!/^[0-9A-Za-z_+\-*/^().,\s]+$/.test(expr)) {
+    throw new Error('Only numbers, operators, parentheses, commas, and supported functions are allowed');
+  }
+  const expressionWithoutNumbers = expr.replace(/(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/g, '0');
+  const identifiers = expressionWithoutNumbers.match(/\b[A-Za-z_]\w*\b/g) || [];
+  for (const name of identifiers) {
+    if (!SAFE_IDENTIFIERS.has(name) && !Object.prototype.hasOwnProperty.call(userVars, name)) {
+      throw new Error(`Unsupported identifier: ${name}`);
+    }
+  }
+  expr = expr.replace(/\^/g,'**').replace(/Ã—/g,'*').replace(/Ã·/g,'/').replace(/âˆ’/g,'-');
+  const scope = {
+    sin:sinF, cos:cosF, tan:tanF, asin:asinF, acos:acosF, atan:atanF,
+    sinh:Math.sinh, cosh:Math.cosh, tanh:Math.tanh,
+    asinh:Math.asinh, acosh:Math.acosh, atanh:Math.atanh,
+    sqrt:Math.sqrt, cbrt, exp:Math.exp, pow:Math.pow,
+    log:Math.log, log2:Math.log2, log10:Math.log10,
+    abs:Math.abs, ceil:Math.ceil, floor:Math.floor, round:Math.round,
+    factorial, comb, perm, gcd, hypot:Math.hypot,
+    sign:Math.sign, min:Math.min, max:Math.max,
+    PI:Math.PI, E:Math.E, TAU:2*Math.PI, Infinity,
+    ...userVars,
+  };
+  const fn = new Function(...Object.keys(scope), `"use strict";return (${expr});`);
+  return fn(...Object.values(scope));
+}
+
+function evalFx(fnStr, xVal) {
+  return evalExpr(fnStr.replace(/\bx\b/g, `(${xVal})`));
+}
+
+// â”€â”€ Mode â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function setMode(m) {
+  calcMode = m;
+  document.getElementById('btnDeg').classList.toggle('active', m === 'degree');
+  document.getElementById('btnRad').classList.toggle('active', m === 'radian');
+  document.getElementById('footerMode').textContent = m === 'degree' ? 'MODE: DEG' : 'MODE: RAD';
+}
+
+// â”€â”€ Tabs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function openTab(btn, name) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  btn.classList.add('active');
+  if (name === 'hist') renderHistory();
+  if (name === 'vars') renderVars();
+}
+
+function pushHist(entry) {
+  history.unshift({ ...entry, ts: new Date().toLocaleTimeString() });
+  if (history.length > 100) history.pop();
+}
+
+// â”€â”€ CALC â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function setOp(op)  { document.getElementById('calcOp').value = op; }
+function appendVal(v) {
+  const el = document.getElementById('calcValue');
+  if (v === String(Math.E) || v === String(Math.PI)) el.value = v; else el.value += v;
+}
+function backspace() { const el = document.getElementById('calcValue'); el.value = el.value.slice(0, -1); }
+function clearCalc() {
+  document.getElementById('calcValue').value = '';
+  document.getElementById('calcExpr').textContent = '';
+  setDisp('0', false);
+}
+function setDisp(val, err) {
+  const el = document.getElementById('calcResult');
+  el.textContent = val;
+  el.className = 'display-result' + (err ? ' error' : '');
+}
+function runCalc() {
+  const op  = document.getElementById('calcOp').value;
+  const raw = document.getElementById('calcValue').value.trim();
+  if (!raw) return;
+  const v = parseFloat(raw);
+  if (isNaN(v)) { setDisp('âš  Invalid number', true); return; }
+  document.getElementById('calcExpr').textContent = `${op}(${raw}) [${calcMode === 'degree' ? 'DEG' : 'RAD'}]`;
+  try {
+    const r   = calcMode === 'degree' ? toRad(v) : v;
+    const ops = {
+      sin:()=>Math.sin(r), cos:()=>Math.cos(r), tan:()=>Math.tan(r),
+      asin:()=>calcMode==='degree'?Math.asin(v)*180/Math.PI:Math.asin(v),
+      acos:()=>calcMode==='degree'?Math.acos(v)*180/Math.PI:Math.acos(v),
+      atan:()=>calcMode==='degree'?Math.atan(v)*180/Math.PI:Math.atan(v),
+      sinh:()=>Math.sinh(v), cosh:()=>Math.cosh(v), tanh:()=>Math.tanh(v),
+      sqrt:()=>Math.sqrt(v), cbrt:()=>cbrt(v), exp:()=>Math.exp(v),
+      log:()=>Math.log(v), log2:()=>Math.log2(v), log10:()=>Math.log10(v),
+      factorial:()=>factorial(v), abs:()=>Math.abs(v),
+      ceil:()=>Math.ceil(v), floor:()=>Math.floor(v),
+      todeg:()=>v*180/Math.PI, torad:()=>v*Math.PI/180,
+    };
+    if (!ops[op]) { setDisp('âš  Unknown op', true); return; }
+    const res = ops[op]();
+    if (!isFinite(res) || isNaN(res)) { setDisp('âš  Undefined / âˆž', true); return; }
+    const pretty = +res.toPrecision(10);
+    setDisp(pretty, false);
+    pushHist({ label: `${op}(${raw})`, result: pretty });
+  } catch(e) { setDisp('âš  ' + e.message, true); }
+}
+
+// â”€â”€ EXPR â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function fillExpr(e) { document.getElementById('exprInput').value = e; }
+function showRC(cid, vid, val, err) {
+  document.getElementById(cid).classList.add('visible');
+  const el = document.getElementById(vid);
+  el.className = 'rc-value' + (err ? ' err' : '');
+  el.textContent = val;
+}
+function runExpr() {
+  const expr = document.getElementById('exprInput').value.trim();
+  if (!expr) return;
+  try {
+    const raw = evalExpr(expr);
+    if (!isFinite(raw) || isNaN(raw)) throw new Error('Result is Infinity or NaN');
+    const pretty = +raw.toPrecision(12);
+    showRC('exprResult', 'exprResultVal', pretty, false);
+    pushHist({ label: expr.length > 32 ? expr.slice(0, 30) + 'â€¦' : expr, result: pretty });
+  } catch(e) { showRC('exprResult', 'exprResultVal', 'âš  ' + e.message, true); }
+}
+
+// â”€â”€ STATS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function runStats() {
+  const nums = document.getElementById('statsInput').value
+    .split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n));
+  if (nums.length < 2) { alert('Enter at least 2 numbers.'); return; }
+  const n = nums.length, sum = nums.reduce((a,b) => a+b, 0), mean = sum / n;
+  const sorted = [...nums].sort((a,b) => a-b);
+  const median = n % 2 ? sorted[Math.floor(n/2)] : (sorted[n/2-1] + sorted[n/2]) / 2;
+  const variance = nums.reduce((a,b) => a + (b-mean)**2, 0) / (n-1);
+  const std = Math.sqrt(variance);
+  const diffs = sorted.map(v => Math.abs(v-median)).sort((a,b) => a-b);
+  const mad = n % 2 ? diffs[Math.floor(n/2)] : (diffs[n/2-1] + diffs[n/2]) / 2;
+  const fmt = v => +v.toPrecision(8);
+  document.getElementById('statsGrid').classList.add('visible');
+  document.getElementById('st-count').textContent  = n;
+  document.getElementById('st-sum').textContent    = fmt(sum);
+  document.getElementById('st-mean').textContent   = fmt(mean);
+  document.getElementById('st-median').textContent = fmt(median);
+  document.getElementById('st-std').textContent    = fmt(std);
+  document.getElementById('st-var').textContent    = fmt(variance);
+  document.getElementById('st-min').textContent    = sorted[0];
+  document.getElementById('st-max').textContent    = sorted[n-1];
+  document.getElementById('st-range').textContent  = fmt(sorted[n-1] - sorted[0]);
+  document.getElementById('st-mad').textContent    = fmt(mad);
+}
+
+// â”€â”€ VARS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function saveVar() {
+  const name  = document.getElementById('varName').value.trim();
+  const value = parseFloat(document.getElementById('varValue').value);
+  if (!name || isNaN(value)) { alert('Name and numeric value required.'); return; }
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name) || SAFE_IDENTIFIERS.has(name) || RESERVED_IDENTIFIERS.has(name)) {
+    alert('Use a unique name that starts with a letter and is not a reserved word.'); return;
+  }
+  userVars[name] = value;
+  document.getElementById('varName').value  = '';
+  document.getElementById('varValue').value = '';
+  renderVars();
+}
+function deleteVar(name) { delete userVars[name]; renderVars(); }
+function renderVars() {
+  const list = document.getElementById('varList');
+  const keys = Object.keys(userVars);
+  if (!keys.length) {
+    list.innerHTML = '<div style="color:var(--ink3);font-family:var(--mono);font-size:0.74rem;padding:0.5rem">No variables saved.</div>';
+    return;
+  }
+  list.innerHTML = keys.map(k =>
+    `<div class="var-item"><span class="vn">${k}</span><span class="vv">= ${userVars[k]}</span><button class="var-del" onclick="deleteVar('${k}')">âœ•</button></div>`
+  ).join('');
+}
+
+// â”€â”€ HISTORY â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function renderHistory() {
+  const list = document.getElementById('historyList');
+  if (!history.length) {
+    list.innerHTML = '<div style="color:var(--ink3);font-family:var(--mono);font-size:0.74rem;padding:1.5rem;text-align:center">No calculations yet.</div>';
+    return;
+  }
+  list.innerHTML = history.slice(0, 60).map(h =>
+    `<div class="history-item"><span class="hi-expr">${h.label}</span><span class="hi-result">${h.result}</span></div>`
+  ).join('');
+}
+function clearHist() { history = []; renderHistory(); }
+
+// â”€â”€ GRAPH â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function setGfn(fn, range) {
+  document.getElementById('graphFn').value = fn;
+  if (range) document.getElementById('graphRange').value = range;
+}
+function plotGraph() {
+  const fnStr = document.getElementById('graphFn').value.trim();
+  const rp    = document.getElementById('graphRange').value.split(',').map(s => parseFloat(s.trim()));
+  const xmin  = isFinite(rp[0]) ? rp[0] : -360;
+  const xmax  = isFinite(rp[1]) ? rp[1] :  360;
+  const steps = 500, step = (xmax - xmin) / steps;
+  const pts = []; let ok = 0;
+  for (let i = 0; i <= steps; i++) {
+    const x = xmin + i * step;
+    try {
+      const y = evalFx(fnStr, x);
+      if (isFinite(y) && Math.abs(y) < 1e9) { pts.push({ x: +x.toFixed(6), y: +y.toPrecision(8) }); ok++; }
+      else pts.push({ x: +x.toFixed(6), y: null });
+    } catch { pts.push({ x: +x.toFixed(6), y: null }); }
+  }
+  const ctx = document.getElementById('mainChart');
+  if (chartInst) chartInst.destroy();
+  chartInst = new Chart(ctx, {
+    type: 'line',
+    data: {
+      datasets: [{
+        label: `f(x) = ${fnStr}`,
+        data: pts,
+        borderColor: '#c9a84c',
+        backgroundColor: 'rgba(201,168,76,0.06)',
+        borderWidth: 2, pointRadius: 0, tension: 0.1, fill: true, spanGaps: false,
+      }]
+    },
+    options: {
+      responsive: true, animation: { duration: 350 }, parsing: false,
+      plugins: {
+        legend: { labels: { color: '#1a1916', font: { family: "'DM Mono'", size: 11 } } },
+        tooltip: { callbacks: { label: c => `(${c.parsed.x.toFixed(3)}, ${c.parsed.y.toFixed(6)})` } }
+      },
+      scales: {
+        x: { type: 'linear', grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { color: '#9a9890', font: { family: "'DM Mono'" }, maxTicksLimit: 10 } },
+        y: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { color: '#9a9890', font: { family: "'DM Mono'" }, maxTicksLimit: 8 } }
+      }
+    }
+  });
+  document.getElementById('graphInfo').textContent = `${ok} pts Â· x âˆˆ [${xmin}, ${xmax}]`;
+}
+
+// â”€â”€ Keyboard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  const id = document.querySelector('.tab-content.active').id;
+  if (id === 'tab-calc')  runCalc();
+  if (id === 'tab-expr')  runExpr();
+  if (id === 'tab-stats') runStats();
+});
+
+// â”€â”€ Clock â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+setInterval(() => {
+  document.getElementById('footerTime').textContent =
+    new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}, 1000);
+
+// â”€â”€ Init â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+plotGraph();
+</script>
+</body>
+</html>
+
